@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gravity Garden</title>
+<style>
+  :root{
+    --bg: #05060a;
+    --bg2: #0a0e1a;
+    --ink: #eef1ff;
+    --ink-dim: #8d94b8;
+    --accent: #7ef2d6;
+    --accent2: #c792ff;
+    --accent3: #ff8fa3;
+    --panel: rgba(15, 18, 32, 0.68);
+    --panel-border: rgba(255,255,255,0.08);
+  }
+  *{ box-sizing: border-box; }
+  html, body{
+    margin:0; padding:0; width:100%; height:100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  canvas{
+    display:block;
+    position: fixed;
+    inset: 0;
+    cursor: crosshair;
+  }
+
+  .vignette{
+    position: fixed; inset:0; pointer-events:none;
+    background: radial-gradient(circle at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%);
+    z-index: 2;
+  }
+
+  header.hud{
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display:flex; justify-content: space-between; align-items: flex-start;
+    padding: 22px 26px;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .title-block{
+    pointer-events: auto;
+  }
+  h1{
+    margin: 0;
+    font-size: clamp(22px, 3.4vw, 34px);
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    background: linear-gradient(95deg, var(--accent), var(--accent2) 55%, var(--accent3));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    background-size: 200% 100%;
+    animation: shimmer 7s ease-in-out infinite;
+  }
+  @keyframes shimmer{
+    0%, 100%{ background-position: 0% 50%; }
+    50%{ background-position: 100% 50%; }
+  }
+  .subtitle{
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--ink-dim);
+    max-width: 46ch;
+  }
+
+  .stats{
+    pointer-events: auto;
+    display: flex;
+    gap: 14px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 10px 16px;
+    backdrop-filter: blur(10px);
+    font-size: 12px;
+    color: var(--ink-dim);
+  }
+  .stats b{
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .stat{ display:flex; flex-direction:column; align-items:center; gap:2px; min-width: 46px; }
+  .stat span{ font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; }
+
+  .panel{
+    position: fixed;
+    bottom: 22px;
+    left: 26px;
+    z-index: 5;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 14px 18px 16px;
+    backdrop-filter: blur(10px);
+    width: 260px;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  .panel h2{
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-dim);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  .row{
+    display:flex; align-items:center; gap: 10px;
+    margin-bottom: 9px;
+    font-size: 12px;
+  }
+  .row label{
+    flex: 0 0 76px;
+    color: var(--ink-dim);
+  }
+  input[type="range"]{
+    flex: 1;
+    accent-color: var(--accent);
+    height: 4px;
+  }
+  .btn-row{
+    display:flex; gap: 8px; margin-top: 10px;
+  }
+  button{
+    flex: 1;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--panel-border);
+    color: var(--ink);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s, border-color 0.2s;
+  }
+  button:hover{ background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.18); }
+  button:active{ transform: scale(0.96); }
+  button.active{
+    background: linear-gradient(95deg, var(--accent), var(--accent2));
+    color: #050608;
+    border-color: transparent;
+    font-weight: 600;
+  }
+
+  .hint{
+    position: fixed;
+    bottom: 22px;
+    right: 26px;
+    z-index: 5;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    backdrop-filter: blur(10px);
+    font-size: 12px;
+    color: var(--ink-dim);
+    max-width: 220px;
+    line-height: 1.5;
+    transition: opacity 1s ease;
+  }
+  .hint kbd{
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
+    color: var(--ink);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .fade-out{ opacity: 0 !important; pointer-events: none; }
+
+  .sound-toggle{
+    pointer-events: auto;
+    margin-left: 10px;
+    align-self: center;
+  }
+
+  @media (max-width: 640px){
+    .panel{ width: calc(100% - 52px); }
+    .hint{ display: none; }
+    .stats{ display: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div class="vignette"></div>
+
+<header class="hud">
+  <div class="title-block">
+    <h1>Gravity Garden</h1>
+    <p class="subtitle">A tiny n-body universe. Click to plant a star, drag to fling matter, watch it sing.</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="statCount">0</b><span>bodies</span></div>
+    <div class="stat"><b id="statFps">0</b><span>fps</span></div>
+    <div class="stat"><b id="statWells">0</b><span>wells</span></div>
+  </div>
+</header>
+
+<div class="panel" id="panel">
+  <h2>Cosmic Controls</h2>
+  <div class="row">
+    <label for="gravity">Gravity</label>
+    <input type="range" id="gravity" min="0" max="200" value="60" />
+  </div>
+  <div class="row">
+    <label for="trail">Trails</label>
+    <input type="range" id="trail" min="2" max="40" value="12" />
+  </div>
+  <div class="row">
+    <label for="count">Particles</label>
+    <input type="range" id="count" min="40" max="900" value="320" />
+  </div>
+  <div class="btn-row">
+    <button id="chaosBtn">🌈 Chaos</button>
+    <button id="soundBtn" class="active">🔊 Sound</button>
+  </div>
+  <div class="btn-row">
+    <button id="resetBtn">↺ Reset</button>
+    <button id="cometBtn">☄ Comet</button>
+  </div>
+</div>
+
+<div class="hint" id="hint">
+  <div><kbd>click</kbd> plant a gravity well</div>
+  <div><kbd>drag</kbd> fling a burst of matter</div>
+  <div><kbd>space</kbd> pause &nbsp; <kbd>c</kbd> chaos &nbsp; <kbd>s</kbd> comet</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  let W, H, DPR;
+
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- Audio (procedural, no samples) ----------
+  let audioCtx = null;
+  let soundOn = true;
+  function ensureAudio(){
+    if (!audioCtx){
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e){ soundOn = false; }
+    } else if (audioCtx.state === 'suspended'){
+      audioCtx.resume();
+    }
+  }
+  function plink(freq, gain, duration){
+    if (!soundOn || !audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const amp = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq * 0.6), t0 + duration);
+    amp.gain.setValueAtTime(0, t0);
+    amp.gain.linearRampToValueAtTime(gain, t0 + 0.012);
+    amp.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(amp).connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.05);
+  }
+  function wellTone(){
+    if (!soundOn || !audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const amp = audioCtx.createGain();
+    osc.type = 'triangle';
+    const base = 110 + Math.random() * 60;
+    osc.frequency.setValueAtTime(base, t0);
+    osc.frequency.exponentialRampToValueAtTime(base * 2.2, t0 + 0.4);
+    amp.gain.setValueAtTime(0.0001, t0);
+    amp.gain.linearRampToValueAtTime(0.12, t0 + 0.05);
+    amp.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.9);
+    osc.connect(amp).connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 1);
+  }
+
+  // ---------- Palette ----------
+  const PALETTE = ['#7ef2d6', '#c792ff', '#ff8fa3', '#8fd3ff', '#ffd98f'];
+  function hueShift(h){ return `hsl(${h}, 85%, 68%)`; }
+
+  // ---------- State ----------
+  let particles = [];
+  let wells = []; // gravity wells planted by click
+  let chaos = false;
+  let paused = false;
+  let gravityStrength = 60;
+  let trailLength = 12;
+  let targetCount = 320;
+  let hueCycle = 0;
+
+  function rand(a, b){ return a + Math.random() * (b - a); }
+
+  function spawnParticle(x, y, vx, vy){
+    const colorIndex = Math.floor(Math.random() * PALETTE.length);
+    particles.push({
+      x: x !== undefined ? x : rand(0, W),
+      y: y !== undefined ? y : rand(0, H),
+      vx: vx !== undefined ? vx : rand(-20, 20),
+      vy: vy !== undefined ? vy : rand(-20, 20),
+      r: rand(1, 2.6),
+      color: PALETTE[colorIndex],
+      hue: rand(0, 360),
+      trail: []
+    });
+  }
+
+  function seed(){
+    particles = [];
+    for (let i = 0; i < targetCount; i++) spawnParticle();
+  }
+
+  function plantWell(x, y, strengthMul){
+    wells.push({
+      x, y,
+      strength: (strengthMul || 1) * rand(0.8, 1.3),
+      born: performance.now(),
+      pulse: 0
+    });
+    wellTone();
+    updateWellStat();
+  }
+
+  function updateWellStat(){
+    document.getElementById('statWells').textContent = wells.length;
+  }
+
+  seed();
+
+  // ---------- Input ----------
+  let pointerDown = false;
+  let dragStart = null;
+  let lastPointer = { x: W/2, y: H/2 };
+
+  function clientToCanvas(e){
+    const touch = e.touches && e.touches[0];
+    const cx = touch ? touch.clientX : e.clientX;
+    const cy = touch ? touch.clientY : e.clientY;
+    return { x: cx, y: cy };
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    ensureAudio();
+    pointerDown = true;
+    const p = clientToCanvas(e);
+    dragStart = { x: p.x, y: p.y, t: performance.now() };
+    lastPointer = p;
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    lastPointer = clientToCanvas(e);
+  });
+
+  window.addEventListener('pointerup', (e) => {
+    if (!pointerDown) return;
+    pointerDown = false;
+    const p = clientToCanvas(e);
+    const dt = performance.now() - dragStart.t;
+    const dx = p.x - dragStart.x;
+    const dy = p.y - dragStart.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < 8 || dt < 90){
+      plantWell(p.x, p.y);
+    } else {
+      const vx = dx / Math.max(dt, 16) * 14;
+      const vy = dy / Math.max(dt, 16) * 14;
+      const n = 18;
+      for (let i = 0; i < n; i++){
+        const jitter = rand(-0.6, 0.6);
+        spawnParticle(
+          dragStart.x + rand(-6,6), dragStart.y + rand(-6,6),
+          vx + jitter * 8, vy + jitter * 8
+        );
+      }
+      plink(300 + dist, 0.08, 0.3);
+    }
+  });
+
+  canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+
+  // ---------- UI wiring ----------
+  const gravityInput = document.getElementById('gravity');
+  const trailInput = document.getElementById('trail');
+  const countInput = document.getElementById('count');
+  const chaosBtn = document.getElementById('chaosBtn');
+  const soundBtn = document.getElementById('soundBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const cometBtn = document.getElementById('cometBtn');
+
+  gravityInput.addEventListener('input', (e) => { gravityStrength = +e.target.value; });
+  trailInput.addEventListener('input', (e) => { trailLength = +e.target.value; });
+  countInput.addEventListener('input', (e) => {
+    targetCount = +e.target.value;
+  });
+
+  chaosBtn.addEventListener('click', () => {
+    chaos = !chaos;
+    chaosBtn.classList.toggle('active', chaos);
+  });
+
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.classList.toggle('active', soundOn);
+    if (soundOn) ensureAudio();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    wells = [];
+    seed();
+    updateWellStat();
+  });
+
+  function spawnComet(){
+    const fromLeft = Math.random() < 0.5;
+    const y = rand(H * 0.1, H * 0.5);
+    const x = fromLeft ? -40 : W + 40;
+    const vx = (fromLeft ? 1 : -1) * rand(9, 14);
+    const vy = rand(1, 3);
+    particles.push({
+      x, y, vx, vy,
+      r: 4.2,
+      color: '#ffffff',
+      hue: 50,
+      comet: true,
+      trail: []
+    });
+    plink(900, 0.1, 0.5);
+  }
+  cometBtn.addEventListener('click', spawnComet);
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space'){ e.preventDefault(); paused = !paused; }
+    if (e.key === 'c' || e.key === 'C'){ chaos = !chaos; chaosBtn.classList.toggle('active', chaos); }
+    if (e.key === 's' || e.key === 'S'){ spawnComet(); }
+    if (e.key === 'r' || e.key === 'R'){ wells = []; seed(); updateWellStat(); }
+  });
+
+  // hide hint after a while
+  const hint = document.getElementById('hint');
+  setTimeout(() => hint.classList.add('fade-out'), 9000);
+
+  // ---------- Physics ----------
+  const G = 2200; // base gravitational constant scaler
+  const MAX_DT = 1/30;
+
+  function step(dt){
+    // gently converge particle count toward target
+    if (particles.length < targetCount){
+      for (let i = 0; i < Math.min(4, targetCount - particles.length); i++) spawnParticle();
+    } else if (particles.length > targetCount){
+      particles.splice(0, Math.min(4, particles.length - targetCount));
+    }
+
+    const g = gravityStrength / 60; // normalized multiplier
+
+    for (let i = 0; i < particles.length; i++){
+      const p = particles[i];
+      let ax = 0, ay = 0;
+
+      // mouse acts as a soft well while dragging / hovering near edge is ignored, only active wells + pointer when held
+      for (let w = 0; w < wells.length; w++){
+        const well = wells[w];
+        const dx = well.x - p.x;
+        const dy = well.y - p.y;
+        const d2 = dx*dx + dy*dy + 400; // softening
+        const d = Math.sqrt(d2);
+        const f = (G * g * well.strength) / d2;
+        ax += f * dx / d;
+        ay += f * dy / d;
+      }
+
+      if (pointerDown){
+        const dx = lastPointer.x - p.x;
+        const dy = lastPointer.y - p.y;
+        const d2 = dx*dx + dy*dy + 600;
+        const d = Math.sqrt(d2);
+        const f = (G * g * 0.6) / d2;
+        ax += f * dx / d;
+        ay += f * dy / d;
+      }
+
+      p.vx += ax * dt;
+      p.vy += ay * dt;
+
+      // light drag so the system doesn't blow up
+      p.vx *= 0.9985;
+      p.vy *= 0.9985;
+
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+
+      // wrap around edges (toroidal space — technically tidy, visually seamless)
+      const pad = 30;
+      if (p.x < -pad) p.x = W + pad;
+      if (p.x > W + pad) p.x = -pad;
+      if (p.y < -pad) p.y = H + pad;
+      if (p.y > H + pad) p.y = -pad;
+
+      p.trail.push({ x: p.x, y: p.y });
+      if (p.trail.length > trailLength) p.trail.shift();
+    }
+
+    // wells slowly decay strength if too many stack up, keep max 6
+    if (wells.length > 6) wells.shift();
+
+    // pulse animation decay for rendering
+    hueCycle += dt * 20;
+  }
+
+  // ---------- Render ----------
+  function render(){
+    ctx.fillStyle = 'rgba(5,6,10,0.28)';
+    ctx.fillRect(0, 0, W, H);
+
+    // wells glow
+    for (let w = 0; w < wells.length; w++){
+      const well = wells[w];
+      const age = (performance.now() - well.born) / 1000;
+      const pulse = 1 + 0.15 * Math.sin(age * 3);
+      const radius = 26 * pulse;
+      const grad = ctx.createRadialGradient(well.x, well.y, 0, well.x, well.y, radius * 4);
+      grad.addColorStop(0, 'rgba(126, 242, 214, 0.5)');
+      grad.addColorStop(0.4, 'rgba(199, 146, 255, 0.18)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(well.x, well.y, radius * 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.fillStyle = '#eef1ff';
+      ctx.arc(well.x, well.y, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.lineCap = 'round';
+    for (let i = 0; i < particles.length; i++){
+      const p = particles[i];
+      const color = p.comet ? '#ffffff' : (chaos ? hueShift((p.hue + hueCycle) % 360) : p.color);
+
+      if (p.trail.length > 1){
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = p.r * (p.comet ? 1.4 : 0.9);
+        ctx.moveTo(p.trail[0].x, p.trail[0].y);
+        for (let t = 1; t < p.trail.length; t++){
+          ctx.lineTo(p.trail[t].x, p.trail[t].y);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.beginPath();
+      ctx.fillStyle = color;
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // pointer glow while dragging
+    if (pointerDown){
+      const grad = ctx.createRadialGradient(lastPointer.x, lastPointer.y, 0, lastPointer.x, lastPointer.y, 60);
+      grad.addColorStop(0, 'rgba(255,255,255,0.25)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(lastPointer.x, lastPointer.y, 60, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ---------- Loop ----------
+  let lastTime = performance.now();
+  let fpsHistory = [];
+  const statCount = document.getElementById('statCount');
+  const statFps = document.getElementById('statFps');
+
+  function loop(now){
+    const dtRaw = (now - lastTime) / 1000;
+    lastTime = now;
+    const dt = Math.min(dtRaw, MAX_DT);
+
+    if (!paused){
+      step(dt);
+    }
+    render();
+
+    fpsHistory.push(1 / Math.max(dtRaw, 0.0001));
+    if (fpsHistory.length > 30) fpsHistory.shift();
+    const avgFps = fpsHistory.reduce((a,b) => a+b, 0) / fpsHistory.length;
+
+    statCount.textContent = particles.length;
+    statFps.textContent = Math.round(avgFps);
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // plant one gentle starter well so the garden isn't static on load
+  setTimeout(() => plantWell(W * 0.5, H * 0.45, 1), 600);
+})();
+</script>
+</body>
+</html>
